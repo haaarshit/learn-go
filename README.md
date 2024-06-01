@@ -61,7 +61,16 @@
     - <a href="#what-is-a-goroutine">What is a goroutine? </a>
 - <a href="#channels">Channels in Go </a>
   - <a href="#create-channel-in-go">Create Channel in Go</a>
+  - <a href="#channel-types-and-values">Create Types in Go</a>
   - <a href="#channel-operations">Channel Operations</a>
+  - <a href="#range-keyword-on-channel">Range keyword on Channels</a>
+  - <a href="#select-statement-in-channel">Select statment in Channels</a>
+- <a href="#mutexes-in-go">Mutexes in Go</a>
+  - <a href="#rw-mutex">RWMutex in Go</a>
+- <a href="#generics-in-go">Generics in Go</a>
+  - <a href="#constraints">Constraints</a>
+    - <a href="#interface-type-list">Interface Type List</a>
+    - <a href="#parametric-constraints">Parametric Constraints</a>
 
 
 ## Go compilation
@@ -1121,6 +1130,7 @@ To invoke a function as a goroutine, use the go keyword
 **When we use `go` keyword we are not able to capture any return value from that function call** Because we are moving on rather than waiting for the function to response.
 
 # Channels
+
 Channel is an important built-in feature in Go. **Channels are a way to communicate  between different goroutines and send data to each other**. It is one of the features that makes Go unique. Along with another unique feature, goroutine, channel makes concurrent programming convenient, fun and lowers the difficulties of concurrent programming.
 
 One suggestion for concurrent programming is don't `communicate by sharing memory`,let them `share memory by communicating` (through channels). 
@@ -1128,6 +1138,15 @@ One suggestion for concurrent programming is don't `communicate by sharing memor
 Communicating by sharing memory and sharing memory by communicating are two programming manners in concurrent programming. When goroutines communicate by sharing memory, we use traditional concurrency synchronization techniques, such as mutex locks, to protect the shared memory to prevent data races. **We can use channels to implement sharing memory by communicating**.
 
 **We can view a channel as an internal FIFO (first in, first out) queue within a program. Some goroutines send values to the queue (the channel) and some other goroutines receive values from the queue.**
+
+## Channel Types and Values
+Channel types can be bi-directional or single-directional. Assume T is an arbitrary type,
+
+`chan T` denotes a bidirectional channel type. Compilers allow both receiving values from and sending values to bidirectional channels.
+
+`chan<- T` denotes a send-only channel type. Compilers don't allow receiving values from send-only channels.
+
+`<-chan T` denotes a receive-only channel type. Compilers don't allow sending values to receive-only channels.
 
 ## Create Channel in Go
 In Go, we use the make() function to create a channel. For example,
@@ -1162,12 +1181,12 @@ The syntax to receive data from the channel is:
 <- message
 ```
 **Channel Operation Example**
+
 ```go
 package main
 import "fmt"
 
 func main() {
-
   // create channel
   number := make(chan int)
   message := make(chan string)
@@ -1178,14 +1197,203 @@ func main() {
   // retrieve channel data
   fmt.Println("Channel Data:", <-number)
   fmt.Println("Channel Data:", <-message)
-
 }
 
 func channelData(number chan int, message chan string) {
-
   // send data into channel
   number <- 15
   message <- "Learning Go channel"
+}
+```
+
+### RANGE keyword on channel
+
+Similar to slices and maps, channels can be ranged over.
+```go
+for item := range ch{
+   // item is the next value received from the channel
+}
+```
+### SELECT statement in channel
+Sometimes we have a single goroutine listening to multiple channels and want to process data in the order it comes through each channel.
+
+A `select` statement is used to listen to multiple channels at the same time. It is similar to a `switch` statement but for channels.
+
+```go
+select {
+   case i,ok := <- chInt:
+       fmt.Println(i)
+   case s,ok := <- chString:
+       fmt.Println(s)
+}
+```
+
+# Mutexes in Go
+Mutexes allow you to `lock` access to data. This allow us which goroutine can access certain data at which time.
+
+**A Mutex is used to provide a locking mechanism to ensure that only one Goroutine is running the critical section of code at any point in time to prevent race conditions(two goroutines running to access the same resource) from happening.**
+
+Go's standard library provides a built-in implementation of a mutex with the `sync.Mutex` type and its two methods:
+- .Lock()
+- .Unlock()
+
+We can protect a block of code by surrounding it with a call to `Lock` and `Unlock`.
+
+Its good practice to structure the protected code within a function so that `defer` can be used to ensure that we never forget to unlock the mutex.
+
+```go
+func protected(){
+
+   mux.Lock()
+   defer mux.Unlock()
 
 }
+```
+**Any code present between a call to Lock and Unlock will be executed by only one Goroutine.**
+```go
+mux.Lock() 
+x = x + 1 // this statement be executed
+          // by only one Goroutine 
+          // at any point of time  
+mux.Unlock()
+```
+## RW Mutex
+Standard library also exposes the `sync.RWMutex`
+
+Maps are safe for concurrent read access, just not concurrent read/write or write/write access. A read/write mutex allows all the readers to access the map at the same time, but a writer will lock out everyone else.
+
+**An RWMutex (Read-Write Mutex) is a reader/writer mutual exclusion lock that allows concurrent read-only access while maintaining exclusive access for writes.**
+
+In addition to these methods
+- .Lock()
+- .Unlock()
+
+The `sync.RWMutex` also has these methods:
+- RLock()
+- RUnlock()
+
+**So How many writers can access a RWMutex at once?**
+- Answer is 1
+
+**How many readers can access a RWMutex at once?**
+- Answer is infinite
+
+**No one can use Mutex if its being written**
+
+# Generics in Go
+
+As Go does not support object oriented programming, that meant for long time that Go code could't easily be reused in many circumstances. For example, some code split a slice into equal 2 parts. The code that splits the slice doesn't really care about the values forteds stored in the slice. But in Go we would need to type same code multiple time for different types. Why is un-DRY(Don't repeat yourself to do) thing to do.
+
+**Type Parameter**
+Put simply, generics allow us to use variable to refer to specific types. This is an amazing feature because it allows us to write abstract functions that drastically reduce code duplication.
+
+```go
+func splitSlice[T any](s []T) ([]T,[]T){
+   mid := len(s)/2
+   return s[:mid],s[mid:]
+}
+```
+In this example above , `T` is the name of the type parameter for the `splitAnySlice` function, and we've said that it must match `any` constraint, which means it can be anything.
+```go
+	sl1 := []int{1,3,54,6,7,8}
+	sl2 := []string{"he","her","they","their","when","who"}
+	fmt.Println(splitSlice(sl1)) 
+	fmt.Println(splitSlice(sl2)) 
+```
+## Constraints
+Sometimes you need the logic in your generic function to know something about the types it operatos on. In above example we used `any` **constraint** because we didn't need to know anything about the types in the slice.
+
+**A type constraint is an interface that defines the set of permissible type arguments for the respective type parameter and controls the opera tions supported by values of that type parameter**
+
+`OR`
+
+**Constraints are essentially rules or conditions that a type must satisfy to be used as a type parameter in a generic function or type**
+
+
+**Creating a custom Constraint**
+
+A `concat` function takes a slice  values and concates the values into a string.
+```go
+type stringer interface{
+   String() string
+}
+
+func concat()[T stringer](val []T) string{
+   result := ""
+   for _,v := range val{
+      resule += v.String()
+   }
+   return result  
+}
+```
+
+### Interface type list
+ 
+When generics was realeased, a new way of writing interfaces was also released at the same time!
+
+We can now simply list a bunch of types to get a new interface/contraints.
+```go
+type Ordered interface{
+   ~int | ~int8 | ~int16 | ~int32 | ~int64 |
+        | ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr |
+        ~float32 | ~float64 |
+        ~string
+}
+```
+**The Ordered interface is a constraint that specifies the types that are allowed.**
+
+Example :-
+```go
+package main
+
+import (
+	"fmt"
+)
+
+// Define the Ordered interface
+type Ordered interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 | ~uintptr |
+	~float32 | ~float64 |
+	~string
+}
+
+// Min function to find the minimum value in a slice of Ordered types
+func Min[T Ordered](slice []T) T {
+	if len(slice) == 0 {
+		panic("cannot find the minimum of an empty slice")
+	}
+	min := slice[0]
+	for _, v := range slice {
+		if v < min {
+			min = v
+		}
+	}
+	return min
+}
+
+func main() {
+	ints := []int{4, 2, 3, 1}
+	floats := []float64{4.4, 2.2, 3.3, 1.1}
+	strings := []string{"delta", "alpha", "charlie", "bravo"}
+
+	fmt.Println("Min of ints:", Min(ints))
+	fmt.Println("Min of floats:", Min(floats))
+	fmt.Println("Min of strings:", Min(strings))
+}
+
+```
+
+### Parametric Constraints
+Your interface definitions, which can later be used as constraints, can accept type parameters as well.
+
+```go
+type store[P product] interface{
+   Sell(P)
+}
+type product interface{
+   Price() float64
+   Name() float64
+}
+
 ```
